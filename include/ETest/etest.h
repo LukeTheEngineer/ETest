@@ -3,7 +3,11 @@
  * @brief   BSD 3-Clause License
  * @date    1.14.2024
  *
- * Copyright (c) 2024 Lukas R. Jackson
+ * @details
+ * This file defines a simple C test framework with assertion macros and logging.
+ * The framework allows the definition and execution of test cases.
+ *
+ * @copyright (c) 2024 Lukas R. Jackson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,48 +43,92 @@
 
 #include "color_code.h"
 
-// Assertion Test cases
-#define TEST_CASE(name) void name##_test_suite()
+/**
+ * @struct testinfo
+ * @brief Structure to hold information about a test.
+ */
+typedef struct
+{
+    const char* suite_name; /**< Name of the test suite. */
+    const char* test_name;  /**< Name of the test. */
+    void (*test_function)(void); /**< Pointer to the test function. */
+} __attribute__((packed)) testinfo;
 
-/* Log levels */
+static testinfo all_tests[500]; /**< Array to store information about all tests. */
+static int num_tests = 0; /**< Number of defined tests. */
+
+/** @enum LogLevel
+ *  @brief Log levels for test framework logging.
+ */
 enum LogLevel
 {
-    INFO,
-    WARNING,
-    ERROR,
-    DEBUG
+    INFO, /**< Information level. */
+    WARNING, /**< Warning level. */
+    ERROR, /**< Error level. */
+    DEBUG /**< Debug level. */
 };
 
+/** @def TEST(suite, name)
+ *  @brief Macro to define a test.
+ *  @param suite The name of the test suite.
+ *  @param name The name of the test.
+ */
+#define TEST(suite, name)                                                          \
+    void test_##suite##_##name(void);                                              \
+    __attribute__((constructor)) void register_test_##suite##_##name(void)         \
+    {                                                                              \
+        all_tests[num_tests++] = (testinfo){#suite, #name, test_##suite##_##name}; \
+    }                                                                              \
+    void test_##suite##_##name(void)
+
+/** @def ETEST_LOG(level, info, ...)
+ *  @brief Macro for logging within the test framework.
+ *  @param level The log level (INFO, WARNING, ERROR, DEBUG).
+ *  @param info The log message format.
+ *  @param ... Additional log message parameters.
+ */
 #define ETEST_LOG(level, info, ...)                                         \
     do                                                                      \
     {                                                                       \
         switch (level)                                                      \
         {                                                                   \
         case INFO:                                                          \
-            printf(BGRN "%s: " CRESET info "\n", "INFO", ##__VA_ARGS__);    \
+            printf(BGRN "%s: " CRESET info "\n", "ETEST INFO", ##__VA_ARGS__);    \
             break;                                                          \
         case WARNING:                                                       \
-            printf(BYEL "%s: " CRESET info "\n", "WARNING", ##__VA_ARGS__); \
+            printf(BYEL "%s: " CRESET info "\n", "ETEST WARNING", ##__VA_ARGS__); \
             break;                                                          \
         case ERROR:                                                         \
-            printf(BRED "%s: " CRESET info "\n", "ERROR", ##__VA_ARGS__);   \
+            printf(BRED "%s: " CRESET info "\n", "ETEST ERROR", ##__VA_ARGS__);   \
             break;                                                          \
         case DEBUG:                                                         \
-            printf(BBLU "%s: " CRESET info "\n", "DEBUG", ##__VA_ARGS__);   \
+            printf(BBLU "%s: " CRESET info "\n", "ETEST DEBUG", ##__VA_ARGS__);   \
             break;                                                          \
         default:                                                            \
             break;                                                          \
         }                                                                   \
     } while (0)
 
+/** @def etest_log(level, info, ...)
+ *  @brief Alias for ETEST_LOG.
+ */
+#define etest_log ETEST_LOG
 
-// Additional assertion macros
+/** @def ASSERT(condition)
+ *  @brief Assertion macro for checking a condition.
+ *  @param condition The condition to check.
+ */
 #define ASSERT(condition)                                                \
     if (!(condition))                                                    \
     {                                                                    \
         printf("Assertion failed: %s, line %d\n", #condition, __LINE__); \
     }
 
+/** @def ASSERT_EQUAL(expected, actual)
+ *  @brief Assertion macro for checking equality.
+ *  @param expected The expected value.
+ *  @param actual The actual value.
+ */
 #define ASSERT_EQUAL(expected, actual)                                                            \
     if ((expected) != (actual))                                                                   \
     {                                                                                             \
@@ -91,6 +139,11 @@ enum LogLevel
         ETEST_LOG(ERROR, "Unexpected Error ");                                                    \
     }
 
+/** @def ASSERT_NOT_EQUAL(not_expected, actual)
+ *  @brief Assertion macro for checking inequality.
+ *  @param not_expected The value not expected.
+ *  @param actual The actual value.
+ */
 #define ASSERT_NOT_EQUAL(not_expected, actual)                                              \
     if ((not_expected) == (actual))                                                         \
     {                                                                                       \
@@ -102,27 +155,36 @@ enum LogLevel
         ETEST_LOG(ERROR, "Unexpected Error ");                                              \
     }
 
-#define ASSERT_NULL(pointer)                                                                \
-    if ((pointer) != NULL)                                                                  \
-    {                                                                                       \
-        printf("Assertion failed: Expected NULL, got non-NULL, line %d\n", __LINE__);       \
+/** @def ASSERT_NULL(pointer)
+ *  @brief Assertion macro for checking if a pointer is NULL.
+ *  @param pointer The pointer to check.
+ */
+#define ASSERT_NULL(pointer)                                                          \
+    if ((pointer) != NULL)                                                            \
+    {                                                                                 \
+        printf("Assertion failed: Expected NULL, got non-NULL, line %d\n", __LINE__); \
     }
 
-#define ASSERT_NOT_NULL(pointer)                                                            \
-    if ((pointer) == NULL)                                                                  \
-    {                                                                                       \
-        printf("Assertion failed: Did not expect NULL, line %d\n", __LINE__);               \
+/** @def ASSERT_NOT_NULL(pointer)
+ *  @brief Assertion macro for checking if a pointer is not NULL.
+ *  @param pointer The pointer to check.
+ */
+#define ASSERT_NOT_NULL(pointer)                                              \
+    if ((pointer) == NULL)                                                    \
+    {                                                                         \
+        printf("Assertion failed: Did not expect NULL, line %d\n", __LINE__); \
     }
 
-
-
-// Macro to run all test cases
-#define RUN_TESTS()                                                                         \
-    do                                                                                      \
-    {                                                                                       \
-        printf("Running tests...\n");                                                       \
-        /* Add more test cases as needed */                                                 \
-        printf("All tests passed!\n");                                                      \
-    } while (0)
+/** @def RUN_TESTS()
+ *  @brief Macro to run all test cases.
+ */
+#define RUN_TESTS()                                                                       \
+    for (int i = 0; i < num_tests; ++i)                                                   \
+    {                                                                                     \
+        ETEST_LOG(INFO, "Running Test: %s.%s\n", all_tests[i].suite_name, all_tests[i].test_name); \
+        all_tests[i].test_function();                                                     \
+        ETEST_LOG(INFO, "Test Passed\n\n");                                                        \
+    }                                                                                     \
+    (0)
 
 #endif /* __ETEST__H */
